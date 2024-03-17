@@ -7,6 +7,7 @@ import requests
 from dotenv import load_dotenv
 import pysqlite3
 import sys
+import streamlit as st
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 load_dotenv()
 

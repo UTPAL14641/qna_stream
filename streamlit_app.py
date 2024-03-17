@@ -25,8 +25,12 @@ messages = []
 client = Client(settings = Settings(persist_directory="./", is_persistent=True))
 collection_ = client.get_or_create_collection(name="test", embedding_function=ef)
 def clear_coll():
-    client.delete_collection(collection_.name)
-    print("Collection deleted successfully")
+    if collection_.name in client.list_collections():
+        # If it exists, delete it
+        client.delete_collection(collection_.name)
+        print("Collection deleted successfully")
+    else:
+       print("empty already")
  
 
 def add_text_to_collection(file: str, word: int = 200) -> None:
@@ -65,13 +69,12 @@ def get_response(queried_texts: List[str],) -> List[Dict]:
     global messages
     
     messages = [
-                {"role": "system", "content": "You are a helpful assistant. <s>[INST]Keep in mind that you will start the answer with the keyword 'Your Answer' and should end the answer with 'End of your answer'. Your answer will try to answer with information provided reference.[/INST]<s>[INST] Use the string annotated as 'Reference' and appears before 'ques'[/INST] <s>[INST] And will always answer the question asked in 'ques:' and \
-                  you will answer the 'ques' using 'Reference' ellaboratively and elegantly combining information from all the pages no.[/INST]."},
+                {"role": "system", "content": "You are a helpful assistant. <s>[INST]Start the answer with <s>[INST] 'Your Answer' and end the answer with 'End of your answer'[/INST]. You will try to answer with information provided in input.[/INST]<s>[INST] Use the string  coming after 'Reference' and appears before 'ques'[/INST] <s>[INST] And will always answer the question asked in 'ques:' and \
+                  answer the 'ques' using 'Reference' ellaboratively and elegantly combining information from all the pages no.[/INST]."},
                 {"role": "user", "content": ''.join(queried_texts)}
                 ]
     message = ' '.join([str(elem) for elem in messages])
     response = query({"inputs": message,})
-    messages = messages + [{"role":'assistant', 'content': response}]
     return response
 
 def get_answer(query: str, n: int):
@@ -80,36 +83,34 @@ def get_answer(query: str, n: int):
     queried_string = f"Reference:{queried_string[0]}" + f"ques: {query}"
     answer = get_response(queried_texts = queried_string,)
     message = ' '.join([str(elem) for elem in answer])
-    pattern = r'Your Answer: (.+?)End of your answer\.'
+    pattern = r'Your Answer: (.+?)\.'
     match = re.search(pattern, message)
     if match:
         substring_after_assistant = match.group(1)
         substring_after_assistant = substring_after_assistant.replace('\\n', '\n')
         return substring_after_assistant
     else:
+        print("it is what it is")
         return message
 
 ################################
 
-def handle_file_upload():
-  uploaded_file = st.file_uploader("Upload PDF", type="pdf")
-  if uploaded_file is not None:
-    
-    try:
-      with open(uploaded_file.name, "rb") as f:
-        f.read(1024) 
-    except Exception as e:
-      st.error(f"Invalid PDF: {str(e)}")
-      return None
 
-    # Create the "artifacts/uploaded" directory if it doesn't exist
-    os.makedirs("artifacts/uploaded", exist_ok=True)
-
-    uploaded_pdf_path = os.path.join("artifacts", "uploaded", uploaded_file.name)
-    with open(uploaded_pdf_path, "wb") as f:
-      f.write(uploaded_file.getbuffer())
-      
     return uploaded_pdf_path
+def handle_file_upload():
+    uploaded_file = st.file_uploader("Upload PDF", type="pdf")
+    clear_coll()
+    if uploaded_file is not None:
+        try:
+            # Use the file object directly
+            with open("artifacts/uploaded/uploaded_pdf.pdf", "wb") as f:
+                f.write(uploaded_file.read())
+        except Exception as e:
+            st.error(f"Invalid PDF: {str(e)}")
+            return None
+
+        return "artifacts/uploaded/uploaded_pdf.pdf"
+
 ##########
 def handle_query(pdf_path: str, request: str):
   query = request
